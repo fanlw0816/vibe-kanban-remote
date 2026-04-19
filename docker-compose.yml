@@ -47,7 +47,7 @@ services:
         condition: service_healthy
 
   remote-server:
-    image: fanlw0816/vibe-kanban-remote:${IMAGE_TAG:-v0.1.43}
+    image: fanlw0816/vibe-kanban-remote:${IMAGE_TAG:-v0.1.44}
     container_name: vibe-kanban-remote
     depends_on:
       postgres:
@@ -60,6 +60,7 @@ services:
       SERVER_LISTEN_ADDR: 0.0.0.0:8081
       ELECTRIC_URL: http://electric:3000
       ELECTRIC_ROLE_PASSWORD: ${ELECTRIC_ROLE_PASSWORD:-remote}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8081}
       SERVER_PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8081}
       VIBEKANBAN_REMOTE_JWT_SECRET: ${VIBEKANBAN_REMOTE_JWT_SECRET:?Required - see .env.example}
 
@@ -68,6 +69,9 @@ services:
       GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+      GITLAB_OAUTH_CLIENT_ID: ${GITLAB_OAUTH_CLIENT_ID:-}
+      GITLAB_OAUTH_CLIENT_SECRET: ${GITLAB_OAUTH_CLIENT_SECRET:-}
+      GITLAB_HOST: ${GITLAB_HOST:-}
 
       # Self-hosted local auth (alternative to OAuth)
       SELF_HOST_LOCAL_AUTH_EMAIL: ${SELF_HOST_LOCAL_AUTH_EMAIL:-}

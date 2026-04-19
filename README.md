@@ -90,11 +90,18 @@ GOOGLE_OAUTH_CLIENT_ID=<your-client-id>
 GOOGLE_OAUTH_CLIENT_SECRET=<your-client-secret>
 ```
 
+**方式 4: GitLab OAuth**
+```bash
+GITLAB_OAUTH_CLIENT_ID=<your-client-id>
+GITLAB_OAUTH_CLIENT_SECRET=<your-client-secret>
+GITLAB_HOST=https://gitlab.com  # 或私有 GitLab 地址，如 https://jihulab.com
+```
+
 ### 可选配置
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `IMAGE_TAG` | Docker 镜像版本 | `v0.1.43` |
+| `IMAGE_TAG` | Docker 镜像版本 | `v0.1.44` |
 | `SERVER_PORT` | 服务端口 | `8081` |
 | `POSTGRES_PORT` | Postgres 外部端口 | `5433` |
 | `POSTGRES_PASSWORD` | Postgres 密码 | `remote` |
@@ -256,7 +263,7 @@ docker-compose up -d
 
 镜像地址: `fanlw0816/vibe-kanban-remote`
 
-可用版本: `v0.1.43`, `latest`
+可用版本: `v0.1.44`, `v0.1.43`, `latest`
 
 ## 许可证
 
