@@ -1,0 +1,146 @@
+# Vibe Kanban Remote Server - Self-hosted deployment
+# Usage:
+#   1. Copy .env.example to .env and configure required variables
+#   2. Run: docker compose up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: vibe-kanban-postgres
+    command: ["postgres", "-c", "wal_level=logical"]
+    environment:
+      POSTGRES_DB: remote
+      POSTGRES_USER: remote
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-remote}
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U remote -d remote"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    restart: unless-stopped
+
+  electric:
+    image: electricsql/electric:1.4.13
+    container_name: vibe-kanban-electric
+    working_dir: /app
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://electric_sync:${ELECTRIC_ROLE_PASSWORD:-remote}@postgres:5432/remote?sslmode=disable
+      PG_PROXY_PORT: 65432
+      LOGICAL_PUBLISHER_HOST: electric
+      AUTH_MODE: insecure
+      ELECTRIC_INSECURE: "true"
+      ELECTRIC_MANUAL_TABLE_PUBLISHING: "true"
+      ELECTRIC_USAGE_REPORTING: "false"
+      ELECTRIC_FEATURE_FLAGS: allow_subqueries,tagged_subqueries
+    volumes:
+      - ./data/electric:/app/persistent
+    depends_on:
+      postgres:
+        condition: service_healthy
+      remote-server:
+        condition: service_healthy
+
+  remote-server:
+    image: fanlw0816/vibe-kanban-remote:${IMAGE_TAG:-v0.1.43}
+    container_name: vibe-kanban-remote
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      RUST_LOG: ${RUST_LOG:-info,remote=info}
+
+      # Core runtime
+      SERVER_DATABASE_URL: postgres://remote:${POSTGRES_PASSWORD:-remote}@postgres:5432/remote
+      SERVER_LISTEN_ADDR: 0.0.0.0:8081
+      ELECTRIC_URL: http://electric:3000
+      ELECTRIC_ROLE_PASSWORD: ${ELECTRIC_ROLE_PASSWORD:-remote}
+      SERVER_PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8081}
+      VIBEKANBAN_REMOTE_JWT_SECRET: ${VIBEKANBAN_REMOTE_JWT_SECRET:?Required - see .env.example}
+
+      # Auth - configure at least one provider
+      GITHUB_OAUTH_CLIENT_ID: ${GITHUB_OAUTH_CLIENT_ID:-}
+      GITHUB_OAUTH_CLIENT_SECRET: ${GITHUB_OAUTH_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+      GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+
+      # Self-hosted local auth (alternative to OAuth)
+      SELF_HOST_LOCAL_AUTH_EMAIL: ${SELF_HOST_LOCAL_AUTH_EMAIL:-}
+      SELF_HOST_LOCAL_AUTH_PASSWORD: ${SELF_HOST_LOCAL_AUTH_PASSWORD:-}
+
+      # Email / notifications (optional)
+      LOOPS_EMAIL_API_KEY: ${LOOPS_EMAIL_API_KEY:-}
+      LOOPS_INVITE_TEMPLATE_ID: ${LOOPS_INVITE_TEMPLATE_ID:-}
+      LOOPS_REVIEW_READY_TEMPLATE_ID: ${LOOPS_REVIEW_READY_TEMPLATE_ID:-}
+      LOOPS_REVIEW_FAILED_TEMPLATE_ID: ${LOOPS_REVIEW_FAILED_TEMPLATE_ID:-}
+      DIGEST_ENABLED: ${DIGEST_ENABLED:-false}
+
+      # Review worker / artifact storage (optional)
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID:-}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY:-}
+      R2_REVIEW_ENDPOINT: ${R2_REVIEW_ENDPOINT:-}
+      R2_REVIEW_BUCKET: ${R2_REVIEW_BUCKET:-}
+      REVIEW_WORKER_BASE_URL: ${REVIEW_WORKER_BASE_URL:-}
+
+      # GitHub App integration (optional)
+      GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+      GITHUB_APP_PRIVATE_KEY: ${GITHUB_APP_PRIVATE_KEY:-}
+      GITHUB_APP_WEBHOOK_SECRET: ${GITHUB_APP_WEBHOOK_SECRET:-}
+      GITHUB_APP_SLUG: ${GITHUB_APP_SLUG:-}
+
+      # Azure Blob storage for attachments (optional)
+      AZURE_STORAGE_ACCOUNT_NAME: ${AZURE_STORAGE_ACCOUNT_NAME:-}
+      AZURE_STORAGE_ACCOUNT_KEY: ${AZURE_STORAGE_ACCOUNT_KEY:-}
+      AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME:-}
+      AZURE_STORAGE_ENDPOINT_URL: ${AZURE_STORAGE_ENDPOINT_URL:-}
+      AZURE_STORAGE_PUBLIC_ENDPOINT_URL: ${AZURE_STORAGE_PUBLIC_ENDPOINT_URL:-}
+    ports:
+      - "${SERVER_PORT:-8081}:8081"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8081/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  # Optional: Azurite for local blob storage (attachments)
+  # Enable with: docker compose --profile attachments up -d
+  azurite:
+    profiles: ["attachments"]
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    container_name: vibe-kanban-azurite
+    command: "azurite-blob --blobHost 0.0.0.0 --blobPort 10000 --loose --skipApiVersionCheck"
+    ports:
+      - "${AZURITE_PORT:-10000}:10000"
+    volumes:
+      - ./data/azurite:/data
+    healthcheck:
+      test: nc 127.0.0.1 10000 -z
+      interval: 1s
+      retries: 30
+
+  azurite-init:
+    profiles: ["attachments"]
+    image: mcr.microsoft.com/azure-cli:latest
+    container_name: vibe-kanban-azurite-init
+    depends_on:
+      azurite:
+        condition: service_healthy
+    environment:
+      AZURE_STORAGE_CONNECTION_STRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite:10000/devstoreaccount1;"
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -e
+        az storage container create --name issue-attachments 2>/dev/null || true
+        az storage cors add --services b --methods GET PUT POST DELETE OPTIONS --origins '*' --allowed-headers '*' --exposed-headers '*' --max-age 3600
+        echo "Azurite CORS configured"
+    volumes:
+      - ./data/azurite:/data
