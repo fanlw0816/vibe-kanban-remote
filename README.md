@@ -182,8 +182,10 @@ npx vibe-kanban
 
 ### 方式 2: 桌面应用
 
-1. 下载桌面应用: [https://github.com/vibe-kanban/vibe-kanban/releases](https://github.com/BloopAI/vibe-kanban/releases/tag/v0.1.43-20260417125614)
-2. 启动时设置环境变量:
+1. 下载桌面应用:
+- 官方: [https://github.com/vibe-kanban/vibe-kanban/releases](https://github.com/BloopAI/vibe-kanban/releases/tag/v0.1.43-20260417125614)
+- 增加了 gitlab oauth 支持的: https://github.com/fanlw0816/vibe-kanban/releases/tag/v0.1.43-dev-202604201116
+3. 启动时设置环境变量:
 
 **macOS/Linux:**
 ```bash
